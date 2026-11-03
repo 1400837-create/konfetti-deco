@@ -218,3 +218,37 @@ IO.libAdd = function(it){
 };
 IO.libDel = function(id){IO.lib=IO.lib.filter(function(x){return x.id!==id});IO.libWrite();if(IO.db)IO.db.collection('lib').doc(id)['delete']().then(null,function(){})};
 IO.deleteProject = function(id){return IO.db?IO.db.collection('projects').doc(id)['delete']().then(function(){return true},function(e){IO.dbErr(e);return false}):Promise.resolve(false)};
+/* ---------- moving everything between the claude.ai version and the stand-alone site: one transfer file ----------
+   It carries the saved projects, «Мои шаблоны», photo analyses, every picture they use, and the scene now open. */
+IO.TRANSFER = 'konfetti-deco-transfer';
+IO.exportAll = function(){
+  var B={kind:IO.TRANSFER,v:1,created:new Date().toISOString(),from:window.SITE?'site':'claude.ai',projects:[],lib:IO.lib.slice(),analyses:[],images:{},current:JSON.parse(JSON.stringify(S))};
+  var get=function(c){return IO.db?IO.db.collection(c).get().then(function(q){return q.docs.map(function(d){var x=d.data()||{};x.id=d.id;return x})},function(){return []}):Promise.resolve([])};
+  toast('Собираю данные для переноса…');
+  return Promise.all([get('projects'),get('lib'),get('analyses')]).then(function(r){
+    B.projects=r[0].filter(function(p){return typeof p.json==='string'}).map(function(p){return {id:p.id,name:String(p.name||'Без названия'),updated:String(p.updated||''),n:+p.n||0,json:p.json}});
+    var have={};B.lib.forEach(function(x){have[x.id]=1});r[1].forEach(function(x){if(!have[x.id]&&IO.libOk(x))B.lib.push(IO.libClean(x))});
+    B.analyses=r[2];
+    var ids=SC.usedImgs(S).concat(IO.libImgs());B.lib.forEach(function(x){x.imgs.forEach(function(i){ids.push(i)})});
+    B.projects.concat(B.analyses).forEach(function(p){try{var o=JSON.parse(p.json);if(o&&o.els)SC.usedImgs(o).forEach(function(i){ids.push(i)})}catch(e){}if(p.ph)ids.push(p.ph)});
+    ids=ids.filter(function(id,i){return id&&ids.indexOf(id)===i});
+    return IO.fetchCloudImgs(ids).then(function(){ids.forEach(function(id){if(IMG[id])B.images[id]=IMG[id]})});
+  }).then(function(){var n=Object.keys(B.images).length;
+    return IO.save('Konfetti Deco — перенос '+B.created.slice(0,10)+'.json',JSON.stringify(B),'text').then(function(ok){if(ok!==false)toast('Файл переноса: проектов '+B.projects.length+', шаблонов '+B.lib.length+', картинок '+n+'.');return B})});
+};
+/* loads a transfer file: pictures and templates into this browser, and — when the page has a shared store (claude.ai, or a room on the site) — projects, templates and analyses into it */
+IO.importAll = function(B){
+  if(!B||B.kind!==IO.TRANSFER)return Promise.reject(new Error('not a transfer file'));
+  var cnt={projects:0,lib:0,images:0,analyses:0,skipped:0},imgs=B.images&&typeof B.images==='object'?B.images:{};
+  Object.keys(imgs).forEach(function(id){var im=imgs[id];if(/^[a-z0-9]{3,24}$/i.test(id)&&im&&/^data:image\//.test(im.src)&&+im.w>0&&+im.h>0){IMG[id]={src:String(im.src),w:+im.w,h:+im.h};IO.saveImg(id);cnt.images++}});
+  var have={};IO.lib.forEach(function(x){have[x.id]=1});
+  (Array.isArray(B.lib)?B.lib:[]).forEach(function(x){if(IO.libOk(x)&&!have[x.id]){IO.lib.push(IO.libClean(x));cnt.lib++}});
+  IO.lib.sort(function(a,b){return a.created<b.created?1:-1});IO.libWrite();
+  if(!IO.db)return Promise.resolve(cnt);
+  var ch=Promise.resolve(),put=function(c,id,d){ch=ch.then(function(){return IO.db.collection(c).doc(id).set(d)})};
+  Object.keys(imgs).forEach(function(id){if(IMG[id]){put('images',id,{src:IMG[id].src,w:IMG[id].w,h:IMG[id].h});IO._cloud[id]=1}});
+  (Array.isArray(B.projects)?B.projects:[]).forEach(function(p){if(p&&/^[a-z0-9_-]{2,40}$/i.test(p.id)&&typeof p.json==='string'){put('projects',p.id,{name:String(p.name||'Без названия').slice(0,80),updated:String(p.updated||''),n:+p.n||0,json:p.json});cnt.projects++}else cnt.skipped++});
+  IO.lib.forEach(function(x){put('lib',x.id,x)});
+  (Array.isArray(B.analyses)?B.analyses:[]).forEach(function(a){if(a&&/^[a-z0-9_-]{2,40}$/i.test(a.id)){var d={};for(var k in a)if(k!=='id')d[k]=a[k];put('analyses',a.id,d);cnt.analyses++}});
+  return ch.then(function(){return cnt});
+};

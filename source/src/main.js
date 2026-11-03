@@ -525,6 +525,7 @@ toast(UI.mmode?'Обведите элементы рамкой или касай
     case 'png':IO.exportScene();break;
     case 'csv':IO.exportCsv();break;
     case 'json':IO.exportJson();break;
+    case 'export-all':IO.exportAll();break;
     case 'offer-png':IO.exportOfferPng();break;
     case 'offer-pdf':IO.exportOfferPdf();break;
     case 'copy-offer':copyFrom($('#offer-text'));break;
@@ -931,6 +932,14 @@ function themeNow(){var t=document.documentElement.getAttribute('data-theme');re
 function menuOpen(id,b){var m=$('#mpop');if(!m)return;if(!m.hidden&&m.dataset.id===id){menuClose();return}
   m.innerHTML=V.mmenu(id);m.dataset.id=id;m.hidden=false;var r=b.getBoundingClientRect();m.style.left=Math.max(4,Math.min(innerWidth-m.offsetWidth-4,r.left))+'px';m.style.top=(r.bottom+2)+'px';
   $$('.mbar .mb').forEach(function(x){x.setAttribute('aria-expanded',x.dataset.id===id)})}
+/* a transfer file from the other version: on the site a room is made first if there is none, so the projects have somewhere to live */
+function transferIn(B){var go=function(){toast('Переношу данные…');return IO.importAll(B).then(function(c){
+    if(B.current&&B.current.els&&!S.els.length){var cur=JSON.parse(JSON.stringify(B.current));cur.pid=null;loadState(cur)}
+    UI.projects=null;render();if(IO.db)refreshProjects();
+    toast('Перенесено: проектов '+c.projects+', шаблонов '+c.lib+', картинок '+c.images+(c.analyses?', разборов фото '+c.analyses:'')+(IO.db?'':'. Проекты появятся в списке после подключения к комнате.'));
+    if(UI.modal&&UI.modal.type==='menu')renderModal();else openModal({type:'menu',title:'Проект'});
+  },function(){toast('Перенос не удался: база не ответила. Попробуйте ещё раз — уже перенесённое не задвоится.')})};
+  if(window.SITE&&!SITE.code())return SITE.connect(SITE.newCode()).then(go);return go()}
 function openTab(id){act('tab',{dataset:{id:id}})}
 function menuClose(){var m=$('#mpop');if(m&&!m.hidden){m.hidden=true;m.dataset.id='';m.innerHTML=''}$$('.mbar .mb').forEach(function(x){x.setAttribute('aria-expanded','false')})}
 /* scrub: drag a label in the options bar sideways to change its number, as in Photoshop; one step goes into the history at the end */
@@ -1009,7 +1018,8 @@ function init(){
   document.addEventListener('change',function(ev){
     var n=ev.target,panel=n.closest&&n.closest('[data-cmyk]');
     if(n.id==='menu-name'){setName(n.value);return}
-    if(n.id==='file'||n.id==='mfile'){menuClose();var f=n.files&&n.files[0];n.value='';if(!f)return;var fr=new FileReader();fr.onload=function(){var o=null;try{o=JSON.parse(fr.result)}catch(e){}
+    if(n.id==='file'||n.id==='mfile'||n.id==='mfile2'){menuClose();var f=n.files&&n.files[0];n.value='';if(!f)return;var fr=new FileReader();fr.onload=function(){var o=null;try{o=JSON.parse(fr.result)}catch(e){}
+        if(o&&o.kind===IO.TRANSFER){transferIn(o);return}
         if(o){o.pid=null;UI.nextLabel=null;if(loadState(o)){UI.modal=null;UI.tab='con';render();toast('Открыт проект «'+S.name+'»')}}else toast('Файл не читается как проект.')};fr.readAsText(f);return}
     if(n.dataset&&n.dataset.up){onUpload(n);return}
     if(panel){

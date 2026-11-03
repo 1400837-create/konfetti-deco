@@ -826,7 +826,7 @@ span.dt{cursor:default}
   <button type="button" class="ib" id="undo" data-act="undo" title="Отменить (Ctrl+Z)" aria-label="Отменить"></button>
   <button type="button" class="ib" id="redo" data-act="redo" title="Вернуть (Ctrl+Y)" aria-label="Вернуть"></button>
   <span class="sp"></span>
-  <span class="ver" id="ver">версия 27</span>
+  <span class="ver" id="ver">версия 28</span>
   <button type="button" class="pill" data-act="photo" id="photobtn"></button>
   <button type="button" class="ib thm" id="thm" data-act="theme" title="Светлая тема" aria-label="Светлая тема" aria-pressed="true"></button>
   <button type="button" class="pill pri" data-act="save" id="savebtn"></button>
@@ -3782,7 +3782,7 @@ V.statbar = function(){var z=R.zone,bad=R.checks.filter(function(c){return !c.ok
 V.hasClip = function(){if(UI.clip)return true;try{return !!localStorage.getItem('fotozona.clip.v1')}catch(e){return false}};
 V.MENUS = {file:'Файл',edit:'Правка',view:'Вид',calc:'Расчёты'};
 V.mmenu = function(id){var it=function(act,lab,o){o=o||{};return '<button type="button" class="mi'+(o.on?' on':'')+'" data-act="'+act+'"'+(o.id?' data-id="'+o.id+'"':'')+(o.dis?' disabled':'')+'><i class="mck" aria-hidden="true">'+(o.on?'✓':'')+'</i><span>'+lab+'</span>'+(o.k?'<kbd>'+o.k+'</kbd>':'')+'</button>'},hr='<hr>',el=V.sel(),ms=V.multi().length>1;
-  if(id==='file')return it('menu','Проекты и шаблоны…')+hr+it('save','Сохранить',{k:'Ctrl+S'})+it('cloud-save-new','Сохранить как новый',{dis:!IO.db||!S.pid})+hr+it('json','Скачать проект файлом')+'<label class="mi"><i class="mck"></i><span>Открыть файл проекта…</span><input type="file" id="mfile" accept=".json,application/json" aria-label="Открыть файл проекта"></label>'+it('png','Скачать сцену картинкой PNG')+hr+it('photo','Собрать сцену по фото…');
+  if(id==='file')return it('menu','Проекты и шаблоны…')+hr+it('save','Сохранить',{k:'Ctrl+S'})+it('cloud-save-new','Сохранить как новый',{dis:!IO.db||!S.pid})+hr+it('json','Скачать проект файлом')+'<label class="mi"><i class="mck"></i><span>Открыть файл проекта…</span><input type="file" id="mfile" accept=".json,application/json" aria-label="Открыть файл проекта"></label>'+it('png','Скачать сцену картинкой PNG')+hr+it('export-all',window.SITE?'Выгрузить всё для переноса':'Перенести всё на сайт: выгрузить файл')+'<label class="mi"><i class="mck"></i><span>'+(window.SITE?'Загрузить перенос из claude.ai…':'Загрузить файл переноса…')+'</span><input type="file" id="mfile2" accept=".json,application/json" aria-label="Файл переноса"></label>'+hr+it('photo','Собрать сцену по фото…');
   if(id==='edit')return it('undo','Отменить',{k:'Ctrl+Z',dis:UI.hi<=0})+it('redo','Вернуть',{k:'Ctrl+Y',dis:UI.hi>=UI.hist.length-1})+it('dopen','История шагов',{id:'hist'})+hr+it(ms?'gdup':'dup','Дублировать',{k:'Ctrl+D',dis:!el&&!ms})+it(ms?'gdel':'del','Удалить',{k:'Del',dis:!el&&!ms})+it('lib-open','В мои шаблоны',{dis:!el&&!ms})+hr+it('copy','Копировать',{k:'Ctrl+C',dis:!el&&!ms})+it('cut','Вырезать',{k:'Ctrl+X',dis:!el&&!ms})+it('paste','Вставить',{k:'Ctrl+V',dis:!V.hasClip()})+hr+it('selall','Выделить всё',{k:'Ctrl+A',dis:!S.els.length})+it('multi','Выбирать несколько',{on:UI.mmode})+it('gclear','Снять выделение',{k:'Esc',dis:!el&&!ms});
   if(id==='view')return it('vt','Размеры на сцене',{id:'dims',on:S.show.dims})+it('vt','Точки накладок',{id:'grid',on:S.show.grid})+(S.ref?it('ref-toggle','Фото-образец поверх сцены',{on:S.ref.on}):'')+it('night','Вечерний вид',{on:UI.night})+(S.els.some(function(e){return e.type==='person'})?it('people','Люди для масштаба',{on:S.els.some(function(e){return e.type==='person'&&!e.hide})}):'')+hr+it('zoom-in','Приблизить',{k:'+'})+it('zoom-out','Отдалить',{k:'−'})+it('zoom-fit','Вписать сцену',{k:'0'})+hr+it('dock','Панели справа',{on:UI.dock!=='mini'})+it('theme','Тёмная тема',{on:themeNow()==='dark'});
   if(id==='calc')return V.TABS.slice(1).map(function(t,i){return it('tab',t[1],{id:t[0],k:String(i+1),on:UI.tab===t[0]})}).join('');
@@ -4008,6 +4008,40 @@ IO.libAdd = function(it){
 };
 IO.libDel = function(id){IO.lib=IO.lib.filter(function(x){return x.id!==id});IO.libWrite();if(IO.db)IO.db.collection('lib').doc(id)['delete']().then(null,function(){})};
 IO.deleteProject = function(id){return IO.db?IO.db.collection('projects').doc(id)['delete']().then(function(){return true},function(e){IO.dbErr(e);return false}):Promise.resolve(false)};
+/* ---------- moving everything between the claude.ai version and the stand-alone site: one transfer file ----------
+   It carries the saved projects, «Мои шаблоны», photo analyses, every picture they use, and the scene now open. */
+IO.TRANSFER = 'konfetti-deco-transfer';
+IO.exportAll = function(){
+  var B={kind:IO.TRANSFER,v:1,created:new Date().toISOString(),from:window.SITE?'site':'claude.ai',projects:[],lib:IO.lib.slice(),analyses:[],images:{},current:JSON.parse(JSON.stringify(S))};
+  var get=function(c){return IO.db?IO.db.collection(c).get().then(function(q){return q.docs.map(function(d){var x=d.data()||{};x.id=d.id;return x})},function(){return []}):Promise.resolve([])};
+  toast('Собираю данные для переноса…');
+  return Promise.all([get('projects'),get('lib'),get('analyses')]).then(function(r){
+    B.projects=r[0].filter(function(p){return typeof p.json==='string'}).map(function(p){return {id:p.id,name:String(p.name||'Без названия'),updated:String(p.updated||''),n:+p.n||0,json:p.json}});
+    var have={};B.lib.forEach(function(x){have[x.id]=1});r[1].forEach(function(x){if(!have[x.id]&&IO.libOk(x))B.lib.push(IO.libClean(x))});
+    B.analyses=r[2];
+    var ids=SC.usedImgs(S).concat(IO.libImgs());B.lib.forEach(function(x){x.imgs.forEach(function(i){ids.push(i)})});
+    B.projects.concat(B.analyses).forEach(function(p){try{var o=JSON.parse(p.json);if(o&&o.els)SC.usedImgs(o).forEach(function(i){ids.push(i)})}catch(e){}if(p.ph)ids.push(p.ph)});
+    ids=ids.filter(function(id,i){return id&&ids.indexOf(id)===i});
+    return IO.fetchCloudImgs(ids).then(function(){ids.forEach(function(id){if(IMG[id])B.images[id]=IMG[id]})});
+  }).then(function(){var n=Object.keys(B.images).length;
+    return IO.save('Konfetti Deco — перенос '+B.created.slice(0,10)+'.json',JSON.stringify(B),'text').then(function(ok){if(ok!==false)toast('Файл переноса: проектов '+B.projects.length+', шаблонов '+B.lib.length+', картинок '+n+'.');return B})});
+};
+/* loads a transfer file: pictures and templates into this browser, and — when the page has a shared store (claude.ai, or a room on the site) — projects, templates and analyses into it */
+IO.importAll = function(B){
+  if(!B||B.kind!==IO.TRANSFER)return Promise.reject(new Error('not a transfer file'));
+  var cnt={projects:0,lib:0,images:0,analyses:0,skipped:0},imgs=B.images&&typeof B.images==='object'?B.images:{};
+  Object.keys(imgs).forEach(function(id){var im=imgs[id];if(/^[a-z0-9]{3,24}$/i.test(id)&&im&&/^data:image\//.test(im.src)&&+im.w>0&&+im.h>0){IMG[id]={src:String(im.src),w:+im.w,h:+im.h};IO.saveImg(id);cnt.images++}});
+  var have={};IO.lib.forEach(function(x){have[x.id]=1});
+  (Array.isArray(B.lib)?B.lib:[]).forEach(function(x){if(IO.libOk(x)&&!have[x.id]){IO.lib.push(IO.libClean(x));cnt.lib++}});
+  IO.lib.sort(function(a,b){return a.created<b.created?1:-1});IO.libWrite();
+  if(!IO.db)return Promise.resolve(cnt);
+  var ch=Promise.resolve(),put=function(c,id,d){ch=ch.then(function(){return IO.db.collection(c).doc(id).set(d)})};
+  Object.keys(imgs).forEach(function(id){if(IMG[id]){put('images',id,{src:IMG[id].src,w:IMG[id].w,h:IMG[id].h});IO._cloud[id]=1}});
+  (Array.isArray(B.projects)?B.projects:[]).forEach(function(p){if(p&&/^[a-z0-9_-]{2,40}$/i.test(p.id)&&typeof p.json==='string'){put('projects',p.id,{name:String(p.name||'Без названия').slice(0,80),updated:String(p.updated||''),n:+p.n||0,json:p.json});cnt.projects++}else cnt.skipped++});
+  IO.lib.forEach(function(x){put('lib',x.id,x)});
+  (Array.isArray(B.analyses)?B.analyses:[]).forEach(function(a){if(a&&/^[a-z0-9_-]{2,40}$/i.test(a.id)){var d={};for(var k in a)if(k!=='id')d[k]=a[k];put('analyses',a.id,d);cnt.analyses++}});
+  return ch.then(function(){return cnt});
+};
 
 /* ===== site.js — only in the stand-alone site (GitHub Pages, like LA CHEF). It stands in for the claude.ai runtime:
    files are saved by the browser itself, projects are kept in this browser and, with a room code, synchronised between
@@ -4581,6 +4615,7 @@ toast(UI.mmode?'Обведите элементы рамкой или касай
     case 'png':IO.exportScene();break;
     case 'csv':IO.exportCsv();break;
     case 'json':IO.exportJson();break;
+    case 'export-all':IO.exportAll();break;
     case 'offer-png':IO.exportOfferPng();break;
     case 'offer-pdf':IO.exportOfferPdf();break;
     case 'copy-offer':copyFrom($('#offer-text'));break;
@@ -4987,6 +5022,14 @@ function themeNow(){var t=document.documentElement.getAttribute('data-theme');re
 function menuOpen(id,b){var m=$('#mpop');if(!m)return;if(!m.hidden&&m.dataset.id===id){menuClose();return}
   m.innerHTML=V.mmenu(id);m.dataset.id=id;m.hidden=false;var r=b.getBoundingClientRect();m.style.left=Math.max(4,Math.min(innerWidth-m.offsetWidth-4,r.left))+'px';m.style.top=(r.bottom+2)+'px';
   $$('.mbar .mb').forEach(function(x){x.setAttribute('aria-expanded',x.dataset.id===id)})}
+/* a transfer file from the other version: on the site a room is made first if there is none, so the projects have somewhere to live */
+function transferIn(B){var go=function(){toast('Переношу данные…');return IO.importAll(B).then(function(c){
+    if(B.current&&B.current.els&&!S.els.length){var cur=JSON.parse(JSON.stringify(B.current));cur.pid=null;loadState(cur)}
+    UI.projects=null;render();if(IO.db)refreshProjects();
+    toast('Перенесено: проектов '+c.projects+', шаблонов '+c.lib+', картинок '+c.images+(c.analyses?', разборов фото '+c.analyses:'')+(IO.db?'':'. Проекты появятся в списке после подключения к комнате.'));
+    if(UI.modal&&UI.modal.type==='menu')renderModal();else openModal({type:'menu',title:'Проект'});
+  },function(){toast('Перенос не удался: база не ответила. Попробуйте ещё раз — уже перенесённое не задвоится.')})};
+  if(window.SITE&&!SITE.code())return SITE.connect(SITE.newCode()).then(go);return go()}
 function openTab(id){act('tab',{dataset:{id:id}})}
 function menuClose(){var m=$('#mpop');if(m&&!m.hidden){m.hidden=true;m.dataset.id='';m.innerHTML=''}$$('.mbar .mb').forEach(function(x){x.setAttribute('aria-expanded','false')})}
 /* scrub: drag a label in the options bar sideways to change its number, as in Photoshop; one step goes into the history at the end */
@@ -5065,7 +5108,8 @@ function init(){
   document.addEventListener('change',function(ev){
     var n=ev.target,panel=n.closest&&n.closest('[data-cmyk]');
     if(n.id==='menu-name'){setName(n.value);return}
-    if(n.id==='file'||n.id==='mfile'){menuClose();var f=n.files&&n.files[0];n.value='';if(!f)return;var fr=new FileReader();fr.onload=function(){var o=null;try{o=JSON.parse(fr.result)}catch(e){}
+    if(n.id==='file'||n.id==='mfile'||n.id==='mfile2'){menuClose();var f=n.files&&n.files[0];n.value='';if(!f)return;var fr=new FileReader();fr.onload=function(){var o=null;try{o=JSON.parse(fr.result)}catch(e){}
+        if(o&&o.kind===IO.TRANSFER){transferIn(o);return}
         if(o){o.pid=null;UI.nextLabel=null;if(loadState(o)){UI.modal=null;UI.tab='con';render();toast('Открыт проект «'+S.name+'»')}}else toast('Файл не читается как проект.')};fr.readAsText(f);return}
     if(n.dataset&&n.dataset.up){onUpload(n);return}
     if(panel){

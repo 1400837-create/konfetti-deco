@@ -1,4 +1,4 @@
-/* Lou Lou Deco — offline cache. The page itself: network first (a new version shows as soon as there is a connection),
+/* Konfetti Deco — offline cache. The page itself: network first (a new version shows as soon as there is a connection),
    the cached copy when offline. Icons, fonts and the PDF library: from the cache, fetched once. */
 const CACHE = 'loulou-__BUILD__';
 const SHELL = ['./', './index.html', './manifest.webmanifest', './icons/icon-192.png', './icons/icon-512.png', './icons/favicon-64.png'];

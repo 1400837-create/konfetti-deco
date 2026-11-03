@@ -8,7 +8,8 @@ self.addEventListener('fetch', (e) => {
   const r = e.request; if (r.method !== 'GET') return;
   const u = new URL(r.url);
   if (u.hostname.endsWith('firebasedatabase.app')) return;            // the shared projects: always live
-  if (r.mode === 'navigate') {
+  if (r.mode === 'navigate' || u.pathname.endsWith('.webmanifest')) {   // the page and the app description: always fresh when online
+    if (r.mode !== 'navigate') { e.respondWith(fetch(r).then((res) => { const cp = res.clone(); caches.open(CACHE).then((c) => c.put(r, cp)); return res }).catch(() => caches.match(r))); return }
     e.respondWith(fetch(r).then((res) => { const cp = res.clone(); caches.open(CACHE).then((c) => c.put('./index.html', cp)); return res }).catch(() => caches.match('./index.html')));
     return;
   }

@@ -1,9 +1,9 @@
 {
-  "id": "./?app=konfetti-deco",
+  "id": "./",
   "name": "Konfetti Deco",
   "short_name": "Konfetti Deco",
   "description": "Конструктор фотозон: сцена, смета, чертежи и предложение клиенту",
-  "start_url": "./?app=konfetti-deco",
+  "start_url": "./",
   "scope": "./",
   "display": "standalone",
   "orientation": "any",

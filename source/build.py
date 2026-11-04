@@ -24,12 +24,18 @@ else:
       '<meta name="apple-mobile-web-app-title" content="Konfetti Deco">\n')
     i=html.index('<title>');j=html.index('</title>')+8
     doc=head+html[i:j]+'\n'+html[j:].replace('<div class="ws" id="ws">','</head>\n<body>\n<div class="ws" id="ws">',1)+'\n</body>\n</html>\n'
-    open(out+'index.html','w',encoding='utf-8').write(doc)
+    # the app lives in app/: a scope of its own, so a tablet that still remembers the first installation offers a fresh one
+    app=out+'app/';os.makedirs(app,exist_ok=True)
+    open(app+'index.html','w',encoding='utf-8').write(doc)
+    shutil.copytree('site_src/icons',app+'icons')
+    shutil.copy('site_src/manifest.webmanifest',app+'manifest.webmanifest')
+    open(app+'sw.js','w',encoding='utf-8').write(open('site_src/sw.js',encoding='utf-8').read().replace('__BUILD__',build))
+    # the old address: removes the first offline cache and goes on to app/
+    open(out+'index.html','w',encoding='utf-8').write(open('site_src/root_index.html',encoding='utf-8').read())
+    open(out+'sw.js','w',encoding='utf-8').write(open('site_src/root_sw.js',encoding='utf-8').read())
     shutil.copytree('site_src/icons',out+'icons')
     os.makedirs(out+'.github/workflows',exist_ok=True);shutil.copy('site_src/.github/workflows/deploy.yml',out+'.github/workflows/deploy.yml')
-    for f in ['manifest.webmanifest','README.md']:
-        if os.path.exists('site_src/'+f):shutil.copy('site_src/'+f,out+f)
-    open(out+'sw.js','w',encoding='utf-8').write(open('site_src/sw.js',encoding='utf-8').read().replace('__BUILD__',build))
+    if os.path.exists('site_src/README.md'):shutil.copy('site_src/README.md',out+'README.md')
     open(out+'.nojekyll','w').write('')
     # the sources travel with the site, so the next change can be built from them
     shutil.copytree('src',out+'source/src');shutil.copy('build.py',out+'source/build.py');shutil.copytree('site_src',out+'source/site_src')

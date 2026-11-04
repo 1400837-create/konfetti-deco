@@ -1,5 +1,5 @@
-/* The first offline cache of Konfetti Deco lived at this address; the app is now in app/. This worker removes the old
-   cache and itself, so nothing stale is served from here any more. */
+/* Konfetti Deco moved to github.io/konfetti/. This worker removes the old Konfetti Deco cache (loulou-*) and itself,
+   then reloads the open window, which forwards to the new address. Caches of other apps on this address are left alone. */
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => {
   e.waitUntil((async () => {
